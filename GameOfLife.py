@@ -324,7 +324,7 @@ def writeRLE(grid):
     """
     Writes grid out to a text file in RLE format
     """
-    filename = unique_file("savedRLE", "txt")
+    filename = unique_file("saved-RLEs/savedRLE", "txt")
     f = open(filename, "w")
     top, bot, minCol, maxCol = findBoundaries(grid)
     #write x,y header
