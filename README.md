@@ -11,5 +11,7 @@ Python program for simulating Conway's Game of Life made by David Kohler and des
 ## Usage
 
 From terminal, two options for usage.
-For unspecified RLE file using a random grid: `python GameOfLife.py`
-To use a specified RLE file: `python GameOfLife.py <RLEfile.rle>`
+
+To use a random starting grid: `python GameOfLife.py`
+
+To use a starting specified RLE file: `python GameOfLife.py <RLEfile.rle>`
