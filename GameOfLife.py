@@ -18,7 +18,7 @@ Author: David Kohler
 Description: This file creates a simulation gif of Conway's Game of Life
 
     Run from command line:
-        python GameOfLife.py {optional: RLEfile.txt}
+        python GameOfLife.py {optional: RLEfile.rle}
 
     RLE text file is optional
 """
@@ -324,7 +324,7 @@ def writeRLE(grid):
     """
     Writes grid out to a text file in RLE format
     """
-    filename = unique_file("saved-RLEs/savedRLE", "txt")
+    filename = unique_file("saved-RLEs/savedRLE", "rle")
     f = open(filename, "w")
     top, bot, minCol, maxCol = findBoundaries(grid)
     #write x,y header
