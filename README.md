@@ -14,4 +14,18 @@ From terminal, two options for usage.
 
 To use a random starting grid: `python GameOfLife.py`
 
-To use a starting specified RLE file: `python GameOfLife.py <RLEfile.rle>`
+To use a starting specified RLE file: `python GameOfLife.py <path to RLE file.rle>`
+
+## Example
+
+Below is an example of a gif created by running the program using a specified RLE file for the Gosper Glider Gun
+
+![Gosper Glider Gun](GoL-gifs/GoL80s300g.gif)
+
+## Authors
+
+David Kohler
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE.md file for details
