@@ -18,9 +18,13 @@ To use a starting specified RLE file: `python GameOfLife.py <path to RLE file.rl
 
 ## Example
 
-Below is an example of a gif created by running the program using a specified RLE file for the Gosper Glider Gun
+First, below is an example of a gif created by running the program using a specified RLE file for the Gosper Glider Gun:
 
 ![Gosper Glider Gun](GoL-gifs/GoL80s300g.gif)
+
+Second, below is an example of a gif created using a random grid of size 40 with 200 generations:
+
+![Random Starting Grid](GoL-gifs/GoL40s200g.gif)
 
 ## Authors
 
