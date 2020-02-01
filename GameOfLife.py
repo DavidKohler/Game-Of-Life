@@ -23,12 +23,21 @@ Description: This file creates a simulation gif of Conway's Game of Life
     RLE text file is optional
 """
 
-def addSpace(grid, extraSpace):
+GRID_CMAP = "tab20_r"#"tab20_r"
+# Some other good cmaps: PuRd, BuPu, Wistia, tab20b_r
+
+def addSpace(grid, desiredSize):
     """
     Adds cells to grid if grid needs to be resized larger
     """
     expandedGrid = grid.copy()
-    for i in range(extraSpace):
+    extraRows = desiredSize[0] - grid.shape[0]
+    extraCols = desiredSize[1] - grid.shape[1]
+    if extraRows < 0:
+        extraRows = 0
+    if extraCols < 0:
+        extraCols = 0
+    for i in range(extraRows):
         expandedGrid = np.append(
             expandedGrid,
             [[0 for i in range(expandedGrid.shape[1])]],
@@ -39,6 +48,7 @@ def addSpace(grid, extraSpace):
             expandedGrid,
             axis = 0
         )
+    for i in range(extraCols):
         expandedGrid = np.append(
             expandedGrid,
             np.array([0 for i in range(expandedGrid.shape[0])])[:,None],
@@ -75,20 +85,17 @@ def createAnimation(inGrid, gridSize, generations):
     while also taking snapshots to compile into an animation at the end
     """
     if not os.path.exists("GoL-gifs"): os.mkdir("GoL-gifs")
-    filename = unique_file("GoL-gifs/GoL{}s{}g".format(gridSize, generations), "gif")
+    filename = unique_file("GoL-gifs/LifeSim".format(generations), "gif")
 
-    fps = input('Please enter desired frame rate (ex. 5, 10, etc.): ')
+    fps = input('Please enter desired gif frame rate (ex. 5, 10, etc.): ')
     while not fps.isdigit():
-        fps = input('Enter desired frame rate as an integer (ex. 5, 10, etc.): ')
+        fps = input('Enter desired gif frame rate as an integer (ex. 5, 10, etc.): ')
 
     Writer = animation.writers['pillow']
     writer = Writer(fps=int(fps), metadata=dict(artist='Me'), bitrate=1800)
 
-    if (inGrid.shape[0] < gridSize) or (inGrid.shape[1] < gridSize):
-        grid = addSpace(inGrid, max(
-            abs(gridSize - inGrid.shape[0]),
-            abs(gridSize - inGrid.shape[1])
-        ))
+    if (inGrid.shape[0] < gridSize[0]) or (inGrid.shape[1] < gridSize[1]):
+        grid = addSpace(inGrid, gridSize)
     else:
         grid = inGrid.copy()
 
@@ -102,7 +109,7 @@ def createAnimation(inGrid, gridSize, generations):
         xycoords='figure pixels',
         size=20
     )
-    plt.imshow(grid, cmap="tab20_r")
+    plt.imshow(grid, cmap=GRID_CMAP)
     camera.snap()
 
     for i in range(generations):
@@ -112,21 +119,23 @@ def createAnimation(inGrid, gridSize, generations):
             xycoords='figure pixels',
             size=20
         )
-        plt.imshow(updateGrid(grid), cmap="tab20_r")
+        plt.imshow(updateGrid(grid), cmap=GRID_CMAP)
         camera.snap()
         print('Generation ({}/{})...'.format(i+1, generations))
 
+    print()
     print('Creating animation... Please wait...')
     ani = camera.animate()
     ani.save(filename, writer = writer)
     print("Done! Saved as {}".format(filename))
+    print()
 
 
 def encodeGrid(grid, top, bot, minCol, maxCol):
     """
     Encodes a grid into a grouping list of RLE tags and counts
     """
-    encodedStrings = []
+    RLEtups = []
     for row in range(top, bot + 1):
         cellCount = 0
         rowString = ''
@@ -134,13 +143,30 @@ def encodeGrid(grid, top, bot, minCol, maxCol):
             cell = grid[row][col]
             rowString += 'o' if cell == 1 else 'b'
         groups = [(label, sum(1 for _ in group)) for label, group in groupby(rowString)]
-        encodedStrings += groups
+        RLEtups += groups
         if row != bot:
-            encodedStrings += [('$', 1)]
+            RLEtups += [('$', 1)]
         else:
-            encodedStrings +=  [('!', 1)]
+            RLEtups +=  [('!', 1)]
 
-    return encodedStrings
+    # Condense encoded Strings per RLE formatting guidelines
+    possibleOptimization = True
+    while possibleOptimization == True:
+        possibleOptimization = False
+        indicesToPop = []
+        for i in range(len(RLEtups)):
+            if (i < len(RLEtups) - 1):
+                if (RLEtups[i + 1][0] in ['$', '!'] and RLEtups[i][0] == 'b'):
+                    indicesToPop.append(i)
+                if (RLEtups[i][0] == RLEtups[i + 1][0]):
+                    RLEtups[i + 1] = (RLEtups[i][0], (RLEtups[i][1] + RLEtups[i + 1][1]))
+                    indicesToPop.append(i)
+        if (len(indicesToPop) > 0):
+            possibleOptimization = True
+            for j in sorted(indicesToPop, reverse=True):
+                del RLEtups[j]
+
+    return RLEtups
 
 
 def findBoundaries(grid):
@@ -187,17 +213,21 @@ def parseInput(args):
     Parses command line arguments to see if RLE file supplied, or if using a
     randomly generated grid
     """
-    gridInput = input('Please enter desired grid size: ')
-    while not gridInput.isdigit():
-        gridInput = input('Please enter desired grid size: ')
-    gridSize = int(gridInput)
+    gridHInput = input('Please enter desired minimum grid height: ')
+    while not gridHInput.isdigit():
+        gridHInput = input('Please enter desired minimum grid height: ')
+    gridWInput = input('Please enter desired minimum grid width: ')
+    while not gridWInput.isdigit():
+        gridWInput = input('Please enter desired minimum grid width: ')
+    # gridSize is height by width (rows by cols)
+    gridSize = (int(gridHInput), int(gridWInput))
 
     if (len(args) == 2):
         #supplied RLE file
         initialGrid = parseRLE(args[1])
     else:
         #create a random grid
-        initialGrid = randomGrid(gridSize)
+        initialGrid = randomGrid(gridSize[0], gridSize[1])
 
     generationInput = input('Please enter desired number of generations: ')
     while not generationInput.isdigit():
@@ -242,22 +272,26 @@ def parseRLE(filename):
             except ValueError:
                 curCt = 1
             if curTag == 'b':
-                gridLine.extend([0 for i in range(curCt)])
+                gridLine.extend([0 for k in range(curCt)])
             else:
-                gridLine.extend([1 for i in range(curCt)])
+                gridLine.extend([1 for k in range(curCt)])
 
         if len(gridLine) != xvalue:
             #fill to end of line
             gridLine.extend([0 for i in range(xvalue - len(gridLine))])
         grid.append(gridLine)
+        if (tagCounts[-1] != ''):
+            #account for gap lines
+            for j in range(int(tagCounts[-1]) - 1):
+                grid.append([0 for k in range(xvalue)])
     return np.array(grid)
 
 
-def randomGrid(N):
+def randomGrid(W, H):
     """
-    Generates a random grid of size N*N with p[0]% dead cells, p[1]% alive cells
+    Generates a random grid of size W*H with p[0]% dead cells, p[1]% alive cells
     """
-    return np.random.choice([0,1], N*N, p=[0.4, 0.6]).reshape(N, N)
+    return np.random.choice([0,1], W*H, p=[0.4, 0.6]).reshape(W, H)
 
 
 def saveRLE(grid):
@@ -324,7 +358,7 @@ def writeRLE(grid):
     """
     Writes grid out to a text file in RLE format
     """
-    filename = unique_file("saved-RLEs/savedRLE", "rle")
+    filename = unique_file("saved-RLEs/RLEfile", "rle")
     f = open(filename, "w")
     top, bot, minCol, maxCol = findBoundaries(grid)
     #write x,y header
@@ -336,9 +370,6 @@ def writeRLE(grid):
     pos = 0
     #write grid with 70 character lines
     while finishedWriting == False:
-        if (pos == len(RLEgroups) - 2) and (RLEgroups[pos][0] == 'b'):
-            pos += 1
-            continue
         if (RLEgroups[pos][1] == 1):
             #single cell
             if (1 + len(individualLine) > 70):
@@ -364,7 +395,7 @@ def writeRLE(grid):
         else:
             pos += 1
     f.close()
-    print('RLE written to {}'.format(filename))
+    print('Done! RLE info saved to {}'.format(filename))
 
 
 
