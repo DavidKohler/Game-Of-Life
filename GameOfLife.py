@@ -23,7 +23,7 @@ Description: This file creates a simulation gif of Conway's Game of Life
     RLE text file is optional
 """
 
-GRID_CMAP = "tab20_r"#"tab20_r"
+GRID_CMAP = "tab20_r"
 # Some other good cmaps: PuRd, BuPu, Wistia, tab20b_r
 
 def addSpace(grid, desiredSize):
@@ -79,7 +79,7 @@ def checkArray(g, r, c):
     return nVal
 
 
-def createAnimation(inGrid, gridSize, generations):
+def createAnimation(inGrid, gridSize, generations, rulestring):
     """
     Executes {generations} number of time step updates to model the Game of Life
     while also taking snapshots to compile into an animation at the end
@@ -119,7 +119,7 @@ def createAnimation(inGrid, gridSize, generations):
             xycoords='figure pixels',
             size=20
         )
-        plt.imshow(updateGrid(grid), cmap=GRID_CMAP)
+        plt.imshow(updateGrid(grid, rulestring), cmap=GRID_CMAP)
         camera.snap()
         print('Generation ({}/{})...'.format(i+1, generations))
 
@@ -149,7 +149,7 @@ def encodeGrid(grid, top, bot, minCol, maxCol):
         else:
             RLEtups +=  [('!', 1)]
 
-    # Condense encoded Strings per RLE formatting guidelines
+    #Condense encoded Strings per RLE formatting guidelines
     possibleOptimization = True
     while possibleOptimization == True:
         possibleOptimization = False
@@ -163,6 +163,7 @@ def encodeGrid(grid, top, bot, minCol, maxCol):
                     indicesToPop.append(i)
         if (len(indicesToPop) > 0):
             possibleOptimization = True
+            #delete multiple indices at once
             for j in sorted(indicesToPop, reverse=True):
                 del RLEtups[j]
 
@@ -224,17 +225,32 @@ def parseInput(args):
 
     if (len(args) == 2):
         #supplied RLE file
-        initialGrid = parseRLE(args[1])
+        initialGrid, rulestring = parseRLE(args[1])
     else:
         #create a random grid
         initialGrid = randomGrid(gridSize[0], gridSize[1])
+        #create rulestring
+        lifeChoice = input('Do you want to use default Game of Life rules? (y/n) ')
+        while (lifeChoice != 'y') and (lifeChoice != 'n'):
+            lifeChoice = input('Do you want to use default Game of Life rules? (y/n) ')
+        if lifeChoice == 'y':
+            #default Game of Life rulestring
+            rulestring = 'B3/S23'
+        else:
+            birthstring = input('Please enter desired birth rule (ex. 23): ')
+            while not birthstring.isdigit():
+                birthstring = input('Please enter desired birth rule (ex. 23): ')
+            survivestring = input('Please enter desired survive rule (ex. 23): ')
+            while not survivestring.isdigit():
+                survivestring = input('Please enter desired survive rule (ex. 23): ')
+            rulestring = 'B{}/S{}'.format(birthstring, survivestring)
 
     generationInput = input('Please enter desired number of generations: ')
     while not generationInput.isdigit():
         generationInput = input('Please enter desired number of generations: ')
     generations = int(generationInput)
 
-    return initialGrid, gridSize, generations
+    return initialGrid, gridSize, generations, rulestring
 
 
 def parseRLE(filename):
@@ -249,10 +265,11 @@ def parseRLE(filename):
             #comment line
             continue
         elif line[0] == 'x':
-            #rule line (note: only considering basic Conway Life rules)
+            #rule line
             chunks = line.split(',')
             xvalue = int(chunks[0].strip().split('=')[1])
             yvalue = int(chunks[1].strip().split('=')[1])
+            rulestring = chunks[2].split('=')[1].strip()
 
         else:
             RLEstring += line
@@ -284,7 +301,25 @@ def parseRLE(filename):
             #account for gap lines
             for j in range(int(tagCounts[-1]) - 1):
                 grid.append([0 for k in range(xvalue)])
-    return np.array(grid)
+    return np.array(grid), rulestring
+
+
+def parseRules(rulestring):
+    """
+    Parses rulestring into its birth and survive components (assuming B/S notation)
+    """
+    birthChunk = list(rulestring.split("/")[0].split('B')[1])
+    surviveChunk = list(rulestring.split("/")[1].split('S')[1])
+    if len(birthChunk) == 0:
+        birthRule = []
+    else:
+        birthRule = [int(i) for i in birthChunk]
+    if len(surviveChunk) == 0:
+        surviveRule = []
+    else:
+        surviveRule = [int(i) for i in surviveChunk]
+
+    return birthRule, surviveRule
 
 
 def randomGrid(W, H):
@@ -294,7 +329,7 @@ def randomGrid(W, H):
     return np.random.choice([0,1], W*H, p=[0.4, 0.6]).reshape(W, H)
 
 
-def saveRLE(grid):
+def saveRLE(grid, rule):
     """
     Prompt and save RLE text file of starting grid
     """
@@ -302,7 +337,7 @@ def saveRLE(grid):
     while (save != 'y') and (save != 'n'):
         save = input('Do you want to save RLE file of starting state? (y/n) ')
     if save == 'y':
-        writeRLE(startingState)
+        writeRLE(startingState, rule)
 
 
 def unique_file(basename, ext):
@@ -316,13 +351,13 @@ def unique_file(basename, ext):
     return actualname
 
 
-def updateGrid(grid):
+def updateGrid(grid, rulestring):
     """
-    Executes a single generation time step according to the rules in Conway's
-    Game of Life, and updates grid accordingly
+    Executes a single generation time step according to the rules specified in
+    rulestring, and updates grid accordingly
     """
     nextGrid = grid.copy()
-
+    birthRule, surviveRule = parseRules(rulestring)
     for i in range(grid.shape[0]):
         for j in range(grid.shape[1]):
             #boundary check
@@ -331,16 +366,16 @@ def updateGrid(grid):
 
             nextState = 0
             if grid[i][j] == 1:
-                #alive cell
-                if (nAlive < 2 or nAlive > 3):
-                    #underpopulation or overpopulation
-                    nextState = 0
-                else:
+                #alive cell, check for survive
+                if (nAlive in surviveRule):
                     #lives on
                     nextState = 1
+                else:
+                    #underpopulation or overpopulation
+                    nextState = 0
             else:
-                #dead cell
-                if (nAlive == 3):
+                #dead cell, check for birth
+                if (nAlive in birthRule):
                     #reproduces
                     nextState = 1
                 else:
@@ -354,7 +389,7 @@ def updateGrid(grid):
     return grid
 
 
-def writeRLE(grid):
+def writeRLE(grid, rule):
     """
     Writes grid out to a text file in RLE format
     """
@@ -362,7 +397,7 @@ def writeRLE(grid):
     f = open(filename, "w")
     top, bot, minCol, maxCol = findBoundaries(grid)
     #write x,y header
-    f.write('x = {}, y = {}\n'.format(str(maxCol - minCol + 1), str(bot - top + 1)))
+    f.write('x = {}, y = {}, rule = {}\n'.format(str(maxCol - minCol + 1), str(bot - top + 1), rule))
     RLEgroups = encodeGrid(grid, top, bot, minCol, maxCol)
     finishedWriting = False
     allLines = []
@@ -404,10 +439,10 @@ if __name__ == '__main__':
     Generates simulation and gif animation of Game of Life, allows user
     to write out RLE file corresponding to grid
     """
-    initialGrid, gridSize, generations = parseInput(sys.argv)
+    initialGrid, gridSize, generations, rulestring = parseInput(sys.argv)
     #save starting state in case user wants to write out RLE later
     startingState = initialGrid.copy()
-    createAnimation(initialGrid, gridSize, generations)
-    saveRLE(startingState)
+    createAnimation(initialGrid, gridSize, generations, rulestring)
+    saveRLE(startingState, rulestring)
 
     sys.exit(0)
