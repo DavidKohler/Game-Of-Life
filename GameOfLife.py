@@ -37,7 +37,7 @@ def addSpace(grid, desiredSize):
         extraRows = 0
     if extraCols < 0:
         extraCols = 0
-    for i in range(extraRows):
+    for i in range(extraRows // 2):
         expandedGrid = np.append(
             expandedGrid,
             [[0 for i in range(expandedGrid.shape[1])]],
@@ -48,7 +48,7 @@ def addSpace(grid, desiredSize):
             expandedGrid,
             axis = 0
         )
-    for i in range(extraCols):
+    for i in range(extraCols // 2):
         expandedGrid = np.append(
             expandedGrid,
             np.array([0 for i in range(expandedGrid.shape[0])])[:,None],
@@ -87,6 +87,10 @@ def createAnimation(inGrid, gridSize, generations, rulestring):
     if not os.path.exists("GoL-gifs"): os.mkdir("GoL-gifs")
     filename = unique_file("GoL-gifs/LifeSim".format(generations), "gif")
 
+    gridOn = input('Do you want to see gridlines? (y/n) ')
+    while (gridOn != 'y') and (gridOn != 'n'):
+        gridOn = input('Do you want to see gridlines? (y/n) ')
+
     fps = input('Please enter desired gif frame rate (ex. 5, 10, etc.): ')
     while not fps.isdigit():
         fps = input('Enter desired gif frame rate as an integer (ex. 5, 10, etc.): ')
@@ -102,7 +106,15 @@ def createAnimation(inGrid, gridSize, generations, rulestring):
     fig = plt.figure()
     fig.set_size_inches(8, 8)
     camera = Camera(fig)
-    plt.axis('off')
+    if (gridOn == 'y'):
+        ax = plt.gca();
+        ax.set_xticks(np.arange(-.5, gridSize[1], 1), minor=True);
+        ax.set_yticks(np.arange(-.5, gridSize[0], 1), minor=True);
+        ax.grid(which='minor', color='w', linestyle='-', linewidth=2)
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+    else:
+        plt.axis('off')
     plt.annotate(
         'Generation (0/{})...'.format(generations),
         xy=(50, 30),
@@ -119,6 +131,15 @@ def createAnimation(inGrid, gridSize, generations, rulestring):
             xycoords='figure pixels',
             size=20
         )
+        if (gridOn == 'y'):
+            ax = plt.gca();
+            ax.set_xticks(np.arange(-.5, gridSize[1], 1), minor=True);
+            ax.set_yticks(np.arange(-.5, gridSize[0], 1), minor=True);
+            ax.grid(which='minor', color='w', linestyle='-', linewidth=2)
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+        else:
+            plt.axis('off')
         plt.imshow(updateGrid(grid, rulestring), cmap=GRID_CMAP)
         camera.snap()
         print('Generation ({}/{})...'.format(i+1, generations))
@@ -228,7 +249,10 @@ def parseInput(args):
         initialGrid, rulestring = parseRLE(args[1])
     else:
         #create a random grid
-        initialGrid = randomGrid(gridSize[0], gridSize[1])
+        gridLive = input('Please enter percent of alive cells (ex: 40, 60, etc.): ')
+        while not gridLive.isdigit():
+            gridLive = input('Please enter percent of alive cells (ex: 40, 60, etc.): ')
+        initialGrid = randomGrid(gridSize[0], gridSize[1], int(gridLive))
         #create rulestring
         lifeChoice = input('Do you want to use default Game of Life rules? (y/n) ')
         while (lifeChoice != 'y') and (lifeChoice != 'n'):
@@ -322,11 +346,13 @@ def parseRules(rulestring):
     return birthRule, surviveRule
 
 
-def randomGrid(W, H):
+def randomGrid(W, H, live):
     """
     Generates a random grid of size W*H with p[0]% dead cells, p[1]% alive cells
     """
-    return np.random.choice([0,1], W*H, p=[0.4, 0.6]).reshape(W, H)
+    pLive = live / 100
+    pDead = 1 - pLive
+    return np.random.choice([0,1], W*H, p=[pDead, pLive]).reshape(W, H)
 
 
 def saveRLE(grid, rule):
@@ -393,6 +419,7 @@ def writeRLE(grid, rule):
     """
     Writes grid out to a text file in RLE format
     """
+    if not os.path.exists("saved-RLEs"): os.mkdir("saved-RLEs")
     filename = unique_file("saved-RLEs/RLEfile", "rle")
     f = open(filename, "w")
     top, bot, minCol, maxCol = findBoundaries(grid)
