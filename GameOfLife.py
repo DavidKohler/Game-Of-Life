@@ -95,6 +95,8 @@ def createAnimation(inGrid, gridSize, generations, rulestring):
     while not fps.isdigit():
         fps = input('Enter desired gif frame rate as an integer (ex. 5, 10, etc.): ')
 
+    if int(fps) <= 0:
+        fps = 1
     Writer = animation.writers['pillow']
     writer = Writer(fps=int(fps), metadata=dict(artist='Me'), bitrate=1800)
 
@@ -363,7 +365,7 @@ def saveRLE(grid, rule):
     while (save != 'y') and (save != 'n'):
         save = input('Do you want to save RLE file of starting state? (y/n) ')
     if save == 'y':
-        writeRLE(startingState, rule)
+        writeRLE(grid, rule)
 
 
 def unique_file(basename, ext):
